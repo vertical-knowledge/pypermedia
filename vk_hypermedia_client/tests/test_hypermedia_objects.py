@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 import pytest
-from ..hypermedia_objects import SirenEntity, SirenAction, SirenLink
+from ..siren import SirenEntity, SirenAction, SirenLink
 
 unit_test = pytest.mark.unit_test
 

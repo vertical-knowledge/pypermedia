@@ -28,7 +28,7 @@ setup(
     description='Python client for hypermedia APIs.',
     long_description=long_description,
 
-    url='http://wiki.vkportal.com/index.php/Codex',
+    url='http://wiki.vkportal.com/index.php/Hypermedia_client',
 
     author='Vertical Knowledge',
     author_email='alex.maskovyak@vertical-knowledge.com',
@@ -51,7 +51,7 @@ setup(
         'Programming Language :: Python :: 3.3',
     ],
 
-    keywords='framework web-page storage archive client rest hypermedia',
+    keywords='client rest hypermedia http proxy siren api',
 
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages().
@@ -65,7 +65,7 @@ setup(
     # If there are model files included in your packages that need to be
     # installed, specify them here.
     package_data={
-        'vk_codex_rest_client': ['VERSION'],
+        'vk_hypermedia_client': ['VERSION'],
     },
 
     # Although 'package_data' is the preferred approach, in some case you may
