@@ -2,6 +2,10 @@ from setuptools import setup, find_packages  # Always prefer setuptools over dis
 from codecs import open  # To use a consistent encoding
 from os import path
 
+__author__ = 'Alex Maskovyak'
+__pkg_name__ = 'pypermedia-client'
+
+
 here = path.abspath(path.dirname(__file__))
 
 # Get the long description from the relevant file
@@ -23,47 +27,37 @@ test_requirements = [
 
 # setuptool packaging info
 setup(
-    name='vk-hypermedia-client',
+    name=__pkg_name__,
     version=version,
     description='Python client for hypermedia APIs.',
     long_description=long_description,
 
-    url='http://wiki.vkportal.com/index.php/Hypermedia_client',
-
-    author='Vertical Knowledge',
+    author=__author__,
     author_email='alex.maskovyak@vertical-knowledge.com',
 
-    license='Other/Proprietary License',
+    license='GPLv2',
 
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
         #   2 - Pre-Alpha, 3 - Alpha, 4 - Beta, 5 - Production/Stable
-        'Development Status :: 5 - Production/Stable',
+        'Development Status :: 4 - Beta',
 
         'Intended Audience :: Developers',
-        'Topic :: Software Development :: Libraries :: Application Frameworks',
+        'Topic :: Software Development :: Libraries :: Python Modules',
 
-        'License :: Other/Proprietary License',
+        'License :: OSI Approved :: GNU General Public License v2 (GPLv2)',
 
-        # Specify the Python versions you support here. In particular, ensure
-        # that you indicate whether you support Python 2, Python 3 or both.
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3.3',
     ],
 
-    keywords='client rest hypermedia http proxy siren api',
+    keywords='client rest hypermedia http proxy siren api hateoas',
 
-    # You can just specify the packages manually here if your project is
-    # simple. Or you can use find_packages().
     packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
 
-    # List run-time dependencies here.  These will be installed by pip when your
-    # project is installed.
     install_requires=install_requirements,
     tests_require=test_requirements,
 
-    # If there are model files included in your packages that need to be
-    # installed, specify them here.
     package_data={
         'vk_hypermedia_client': ['VERSION'],
     },
