@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 import pytest
-from ..siren import SirenEntity, SirenAction, SirenLink
+from ..siren import SirenBuilder, SirenEntity, SirenAction, SirenLink
 
 unit_test = pytest.mark.unit_test
 
@@ -49,7 +49,10 @@ def test_from_api_response():
       }
     }"""
 
-    so = SirenEntity.from_api_response(json)
+    sb = SirenBuilder()
+    sb.verify = False
+    sb.request_factory = None
+    so = sb.from_api_response(json)
     assert 'Resource' in so.classnames
     assert so.properties['url']
     assert so.properties['time_fetched']
