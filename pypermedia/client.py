@@ -2,8 +2,8 @@ import requests
 import requests.exceptions
 import sys
 
-from pypermedia_client.gzip_requests import GzipRequest
-from pypermedia_client.siren import SirenBuilder
+from pypermedia.gzip_requests import GzipRequest
+from pypermedia.siren import SirenBuilder
 
 
 class HypermediaClient(object):
