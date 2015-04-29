@@ -12,7 +12,7 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'DESCRIPTION.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
-with open(path.join(here, 'vk_hypermedia_client', 'VERSION'), encoding='utf-8') as f:
+with open(path.join(here, 'pypermedia_client', 'VERSION'), encoding='utf-8') as f:
     version = f.read().strip()
 
 # run-time dependencies, listed here so that they can be shared with test requirements
@@ -59,7 +59,7 @@ setup(
     tests_require=test_requirements,
 
     package_data={
-        'vk_hypermedia_client': ['VERSION'],
+        'pypermedia_client': ['VERSION'],
     },
 
     # Although 'package_data' is the preferred approach, in some case you may
