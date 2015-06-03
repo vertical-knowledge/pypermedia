@@ -394,7 +394,7 @@ class SirenAction(RequestMixin):
         # depending upon the method we need to use params or data for field transmission
         if self.method == 'GET':
             req = self.request_factory(self.method, bound_href, params=fields)
-        elif self.method == 'PUT' or self.method == 'POST':
+        elif self.method in ['PUT', 'POST', 'PATCH']:
             req = self.request_factory(self.method, bound_href, data=fields)
 
         return req.prepare()
