@@ -111,15 +111,19 @@ class SirenBuilder(RequestMixin):
                 actions.append(siren_action)
 
             links = []  # odd that multiple links can have the same relationship and that because this is a list we could have overloading?? this will break python!
-            for links_dict in response.get('links', {}):
-                rel = links_dict['rel']
-                href = links_dict['href']
-                link = SirenLink(rel=rel, href=href)
-                link.verify = self.verify
-                link.request_factory = self.request_factory
+            for links_dict in response.get('links', []):
+                link = self._construct_link(links_dict)
                 links.append(link)
 
-            siren_entity = SirenEntity(classnames=classname, properties=properties, actions=actions, links=links)
+            entities = []
+            for entities_dict in response.get('entities', []):
+                try: # Try it as a link style subentity
+                    entity = self._construct_link(entities_dict)
+                except KeyError: # otherwise assume it is a full subentity
+                    entity = self.from_api_response(entities_dict)
+                entities.append(entity)
+
+            siren_entity = SirenEntity(classnames=classname, properties=properties, actions=actions, links=links, entities=entities)
             siren_entity.verify = self.verify
             siren_entity.request_factory = self.request_factory
 
@@ -127,13 +131,27 @@ class SirenBuilder(RequestMixin):
         except Exception as e:
             raise MalformedSirenError(message='Siren response is malformed and is missing one or more required values. Unable to create python object representation.', errors=e)
 
+    def _construct_link(self, links_dict):
+        """
+        Constructs a link from the links dictionary.
+
+        :param dict links_dict: A dictionary include a {key: list, href: unicode}
+        :return: A SirenLink representing the link
+        :rtype: SirenLink
+        """
+        rel = links_dict['rel']
+        href = links_dict['href']
+        link = SirenLink(rel=rel, href=href)
+        link.verify = self.verify
+        link.request_factory = self.request_factory
+        return link
 
 class SirenEntity(RequestMixin):
     """Represents a siren-entity object. This is the highest-level/root item used by Siren. These represent instances/classes."""
 
     log = logging.getLogger(__name__)
 
-    def __init__(self, classnames, links, properties=None, actions=None):
+    def __init__(self, classnames, links, properties=None, actions=None, entities=None):
         """
         Constructor.
 
@@ -158,6 +176,7 @@ class SirenEntity(RequestMixin):
         #if not links or len(links) == 0:
         #    raise ValueError('Parameter "links" must have at least one element.')
         self.links = links  # store this as a dictionary of rel->siren, also ensure that rels are not duplicated
+        self.entities = entities or []
 
     def get_link(self, rel):
         """
@@ -173,6 +192,20 @@ class SirenEntity(RequestMixin):
 
         link = next((x for x in self.links if rel in x.rel), None)  # should change this so that links are added to an internal dictionary? this seems like a flaw in siren
         return link
+
+    def get_entities(self, rel):
+        """
+        Obtains an entity based upon the relationship
+        value.
+
+        :param rel: relationship between this entity and the linked resource
+        :type rel: str
+        :return: link to the resource with the specified relationship
+        :rtype: list
+        """
+        if not self.entities:
+            return None
+        return [x for x in self.entities if rel in x.rel]
 
     def get_primary_classname(self):
         """
@@ -191,7 +224,6 @@ class SirenEntity(RequestMixin):
         :rtype: str
         """
         return self.classnames[1:] if len(self.classnames) > 1 else None
-
 
     def as_siren(self):
         """
@@ -245,6 +277,12 @@ class SirenEntity(RequestMixin):
                 method_def = _create_action_fn(link, siren_builder)
 
                 setattr(ModelClass, method_name, method_def)
+
+        def get_entity(obj, rel):
+            matching_entities = self.get_entities(rel) or []
+            for x in matching_entities:
+                yield x.as_python_object()
+        setattr(ModelClass, 'get_entities', get_entity)
 
         return ModelClass()
 
@@ -396,6 +434,8 @@ class SirenAction(RequestMixin):
             req = self.request_factory(self.method, bound_href, params=fields)
         elif self.method in ['PUT', 'POST', 'PATCH']:
             req = self.request_factory(self.method, bound_href, data=fields)
+        else:
+            req = self.request_factory(self.method, bound_href)
 
         return req.prepare()
 
@@ -431,7 +471,7 @@ class SirenAction(RequestMixin):
         return result
 
 
-class SirenLink(RequestMixin):
+class SirenLink(SirenBuilder):
     """Representation of a Link in Siren. Links are traversals to related objects that exist outside of normal entity (parent-child) ownership."""
 
     def __init__(self, rel, href, verify=False, request_factory=GzipRequest):
@@ -511,6 +551,20 @@ class SirenLink(RequestMixin):
         """
         req = self.request_factory('GET', self.href)
         return req.prepare()
+
+    def as_python_object(self, **kwargs):
+        """
+        Constructs the link as a python object by
+        first making a request and then constructing the
+        corresponding object.
+
+        :param kwfields: query/post parameters to add to the request, parameter type depends upon HTTP verb in use  # limitation of siren
+        :return: The SirenEntity constructed from the respons from the api.
+        :rtype: SirenEntity
+        """
+        resp = self.make_request()
+        siren_entity = self.from_api_response(resp)
+        return siren_entity.as_python_object()
 
     def make_request(self, verify=False, **kwfields):
         """
