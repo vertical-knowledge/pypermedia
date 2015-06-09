@@ -69,7 +69,7 @@ class TestSirenBuilder(unittest2.TestCase):
         entity = {'class': ['blah']}
         resp = Response()
         resp.status_code = 200
-        resp._content = json.dumps(entity)
+        resp._content = six.binary_type(json.dumps(entity).encode('utf8'))
         builder = SirenBuilder()
         siren = builder.from_api_response(resp)
         self.assertIsInstance(siren, SirenEntity)
@@ -90,14 +90,14 @@ class TestSirenEntity(unittest2.TestCase):
 
     def test_get_link_no_links(self):
         entity = SirenEntity(['blah'], None)
-        self.assertIsNone(entity.get_link('sakdf'))
+        self.assertIsNone(entity.get_links('sakdf'))
 
     def test_get_link(self):
         link = mock.Mock(rel=['myrel'])
         entity = SirenEntity(['blah'], [link])
-        resp = entity.get_link('myrel')
-        self.assertEqual(link, resp)
-        self.assertIsNone(entity.get_link('badrel'))
+        resp = entity.get_links('myrel')
+        self.assertEqual([link], resp)
+        self.assertListEqual(entity.get_links('badrel'), [])
 
     def test_get_entity_no_entities(self):
         entity = SirenEntity(['blah'], None)
@@ -106,8 +106,8 @@ class TestSirenEntity(unittest2.TestCase):
     def test_get_entities(self):
         ent = mock.Mock(rel=['myrel'])
         entity = SirenEntity(['blah'], [ent])
-        resp = entity.get_link('myrel')
-        self.assertEqual(ent, resp)
+        resp = entity.get_links('myrel')
+        self.assertEqual([ent], resp)
         self.assertEqual(entity.get_entities('badrel'), [])
 
     def test_get_primary_classname(self):

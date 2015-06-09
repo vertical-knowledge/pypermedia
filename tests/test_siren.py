@@ -61,9 +61,9 @@ def test_from_api_response():
 
     links = so.links
     assert links and len(links) == 2
-    assert so.get_link('self').href == '/resources?url=http://slashdot.org'
-    assert so.get_link('double-self').href == '/resources?url=http://slashdot.org'
-    assert so.get_link('view').href == '/views/5e88ecafcfe0520766cede7ef76dc16b2d869f5f6ce37141fde4224780a839c5dac26014336a22fabcf475873a5d254245e954fd9646e84c8e6ab087934eb873'
+    assert so.get_links('self').href == '/resources?url=http://slashdot.org'
+    assert so.get_links('double-self').href == '/resources?url=http://slashdot.org'
+    assert so.get_links('view').href == '/views/5e88ecafcfe0520766cede7ef76dc16b2d869f5f6ce37141fde4224780a839c5dac26014336a22fabcf475873a5d254245e954fd9646e84c8e6ab087934eb873'
 
     actions = so.actions
     assert actions and len(actions) == 1

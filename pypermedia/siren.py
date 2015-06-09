@@ -35,7 +35,7 @@ def _check_and_decode_response(response):
 
     # return none when the code is errant, we should log this as well
     if response.status_code > 299 or response.status_code < 200:
-        raise UnexpectedStatusError(message='Received an unexpected status code of "{}"! Unable to construct siren objects.'.format(response.status_code))
+        raise UnexpectedStatusError(message='Received an unexpected status code of "{0}"! Unable to construct siren objects.'.format(response.status_code))
 
     response = response.text
     if not response:
@@ -174,7 +174,7 @@ class SirenEntity(RequestMixin):
         self.links = links or [] # store this as a dictionary of rel->siren, also ensure that rels are not duplicated
         self.entities = entities or []
 
-    def get_link(self, rel):
+    def get_links(self, rel):
         """
         Obtains a link based upon relationship value.
 
@@ -186,8 +186,7 @@ class SirenEntity(RequestMixin):
         if not self.links:
             return None
 
-        link = next((x for x in self.links if rel in x.rel), None)  # should change this so that links are added to an internal dictionary? this seems like a flaw in siren
-        return link
+        return [x for x in self.links if rel in x.rel]  # should change this so that links are added to an internal dictionary? this seems like a flaw in siren
 
     def get_entities(self, rel):
         """
@@ -229,9 +228,9 @@ class SirenEntity(RequestMixin):
         :rtype: dict[str]
         """
         new_dict = {'class': self.classnames, 'properties': self.properties}
-        new_dict['actions'] = map(operator.methodcaller('as_siren'), self.actions)
-        new_dict['entities'] = map(operator.methodcaller('as_siren'), self.entities)
-        new_dict['links'] = map(operator.methodcaller('as_siren'), self.links)
+        new_dict['actions'] = [action.as_siren() for action in self.actions]
+        new_dict['entities'] = [entity.as_siren() for entity in self.entities]
+        new_dict['links'] = [link.as_siren() for link in self.links]
         return new_dict
 
     def as_json(self):
@@ -371,7 +370,10 @@ class SirenAction(RequestMixin):
         :return: dictionary of field key/value pairs that will be sent with this action.
         :rtype: dict[str, object]
         """
-        return {f['name']: f.get('value', None) for f in self.fields}
+        fields_dict = {}
+        for f in self.fields:
+            fields_dict[f['name']] = f.get('value', None)
+        return fields_dict
 
     def as_siren(self):
         """
@@ -405,14 +407,20 @@ class SirenAction(RequestMixin):
         # bind and remove these the fields so that they do not get passed on
         templated_href = TemplatedString(self.href)
         import urllib
-        url_params = {key: urllib.quote_plus(val) for key, val in kwfields.items() if type(val) in (str, unicode)}
+        url_params = {}
+        for k, v in kwfields.items():
+            if isinstance(v, six.string_types):
+                url_params[k] = urllib.quote_plus(v)
         bound_href = templated_href.bind(**url_params)
         if bound_href.has_unbound_variables():
             raise ValueError('Unbound template parameters in url detected! All variables must be specified! Unbound variables: {}'.format(bound_href.unbound_variables()))
         bound_href = bound_href.as_string()
 
         url_variables = templated_href.unbound_variables()
-        request_fields = {k: v for k, v in kwfields.items() if k not in url_variables}  # remove template variables
+        request_fields = {}
+        for k, v in kwfields.items():
+            if k not in url_variables:  # remove template variables
+                request_fields[k] = v
 
         # update query/post parameters specified from sirenaction with remaining arg values (we ignore anything not specified for the action)
         fields = self.get_fields_as_dict()
@@ -480,14 +488,14 @@ class SirenLink(SirenBuilder):
         if not rel:
             raise ValueError('Parameter "rel" is required.')
 
-        if type(rel) in (str, unicode):
+        if isinstance(rel, six.string_types):
             rel = [rel, ]
 
         if len(rel) == 0:
             raise ValueError('Parameter "rel" must be a string or list of at least one element.')
         self.rel = list(rel)
 
-        if not href and type(href) not in (str, unicode):
+        if not href or not isinstance(href, six.string_types):
             raise ValueError('Parameter "href" must be a string.')
         self.href = href
 
@@ -608,7 +616,9 @@ class TemplatedString(object):
         # locate parameters
         param_locator = re.compile('\{[^}]+\}')
         params = param_locator.findall(self.base)
-        self.param_dict = {p.replace('{', '').replace('}', ''): p for p in params}
+        self.param_dict = {}
+        for p in params:
+            self.param_dict[p.replace('{', '').replace('}', '')] = p
 
     def items(self):
         """
