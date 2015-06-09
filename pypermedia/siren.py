@@ -66,6 +66,8 @@ class SirenBuilder(RequestMixin):
         :type response: str or unicode or requests.Response
         :return: siren entity graph
         :rtype: SirenEntity
+        :raises: MalformedSirenError
+        :raises: TypeError
         """
         # get string
         if isinstance(response, Response):
@@ -95,12 +97,13 @@ class SirenBuilder(RequestMixin):
         :param dict entity_dict:
         :return: The SirenEntity representing the object
         :rtype: SirenEntity
+        :raises KeyError
         """
         classname = entity_dict['class']
         properties = entity_dict.get('properties', {})
 
         actions = []  # odd that multiple actions can have the same name, is this for overloading? it will break python!
-        for action_dict in entity_dict.get('actions', {}):
+        for action_dict in entity_dict.get('actions', []):
             siren_action = SirenAction(request_factory=self.request_factory, verify=self.verify, **action_dict)
             actions.append(siren_action)
 
@@ -129,11 +132,13 @@ class SirenBuilder(RequestMixin):
         :param dict links_dict: A dictionary include a {key: list, href: unicode}
         :return: A SirenLink representing the link
         :rtype: SirenLink
+        :raises: KeyError
         """
         rel = links_dict['rel']
         href = links_dict['href']
         link = SirenLink(rel=rel, href=href, verify=self.verify, request_factory=self.request_factory)
         return link
+
 
 class SirenEntity(RequestMixin):
     """Represents a siren-entity object. This is the highest-level/root item used by Siren. These represent instances/classes."""

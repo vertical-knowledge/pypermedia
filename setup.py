@@ -27,7 +27,9 @@ install_requirements = [
 ]
 
 test_requirements = [
-    'pytest'
+    'mock',
+    'pytest',
+    'unittest2'
 ] + install_requirements
 
 
