@@ -7,6 +7,7 @@ import json
 import logging
 import operator
 import re
+import six
 from requests import Response, Session
 
 from pypermedia.gzip_requests import GzipRequest
@@ -15,6 +16,32 @@ from pypermedia.gzip_requests import GzipRequest
 # =====================================
 # Siren element->object representations
 # =====================================
+
+
+def _check_and_decode_response(response):
+    """
+    Checks if the response is valid.  If it is,
+    it returns the response body.  Otherwise
+    it raises an exception or returns None if
+    the status_code is 404.
+
+    :param Response response: The response to check
+    :return: The response body if appropriate.
+    :rtype: unicode
+    """
+    # not found is equivalent to none
+    if response.status_code == 404:
+        return None
+
+    # return none when the code is errant, we should log this as well
+    if response.status_code > 299 or response.status_code < 200:
+        raise UnexpectedStatusError(message='Received an unexpected status code of "{}"! Unable to construct siren objects.'.format(response.status_code))
+
+    response = response.text
+    if not response:
+        raise MalformedSirenError(message='Parameter "response" object had empty response content. Unable to construct siren objects.')
+    return response
+
 
 class RequestMixin(object):
     """Values for any request creating object."""
@@ -41,21 +68,11 @@ class SirenBuilder(RequestMixin):
         :rtype: SirenEntity
         """
         # get string
-        if type(response) is Response:
-            # not found is equivalent to none
-            if response.status_code == 404:
-                return None
-
-            # return none when the code is errant, we should log this as well
-            if response.status_code > 299 or response.status_code < 200:
-                raise UnexpectedStatusError(message='Received an unexpected status code of "{}"! Unable to construct siren objects.'.format(response.status_code))
-
-            response = response.text
-            if not response:
-                raise MalformedSirenError(message='Parameter "response" object had empty response content. Unable to construct siren objects.')
+        if isinstance(response, Response):
+            response = _check_and_decode_response(response)
 
         # convert to dict
-        if type(response) in (str, unicode):
+        if isinstance(response, six.string_types):
             try:
                 response = json.loads(response)
             except ValueError as e:
@@ -66,45 +83,44 @@ class SirenBuilder(RequestMixin):
             raise TypeError('Siren object construction requires a valid response, json, or dict object.')
 
         try:
-            # let's get rolling!
-            classname = response['class']
-            properties = response.get('properties', {})
-
-            actions = []  # odd that multiple actions can have the same name, is this for overloading? it will break python!
-            for action_dict in response.get('actions', {}):
-                params = {
-                    'name': action_dict['name'],
-                    'title': action_dict.get('title'),
-                    'method': action_dict['method'],
-                    'href': action_dict['href'],
-                    'type': action_dict.get('type'),
-                    'fields': action_dict.get('fields')
-                }
-                siren_action = SirenAction(**params)
-                siren_action.verify = self.verify
-                siren_action.request_factory = self.request_factory
-                actions.append(siren_action)
-
-            links = []  # odd that multiple links can have the same relationship and that because this is a list we could have overloading?? this will break python!
-            for links_dict in response.get('links', []):
-                link = self._construct_link(links_dict)
-                links.append(link)
-
-            entities = []
-            for entities_dict in response.get('entities', []):
-                try: # Try it as a link style subentity
-                    entity = self._construct_link(entities_dict)
-                except KeyError: # otherwise assume it is a full subentity
-                    entity = self.from_api_response(entities_dict)
-                entities.append(entity)
-
-            siren_entity = SirenEntity(classnames=classname, properties=properties, actions=actions, links=links, entities=entities)
-            siren_entity.verify = self.verify
-            siren_entity.request_factory = self.request_factory
-
-            return siren_entity
+            return self._construct_entity(response)
         except Exception as e:
             raise MalformedSirenError(message='Siren response is malformed and is missing one or more required values. Unable to create python object representation.', errors=e)
+
+    def _construct_entity(self, entity_dict):
+        """
+        Constructs an entity from a dictionary. Used
+        for both entities and embedded sub-entities.
+
+        :param dict entity_dict:
+        :return: The SirenEntity representing the object
+        :rtype: SirenEntity
+        """
+        classname = entity_dict['class']
+        properties = entity_dict.get('properties', {})
+
+        actions = []  # odd that multiple actions can have the same name, is this for overloading? it will break python!
+        for action_dict in entity_dict.get('actions', {}):
+            siren_action = SirenAction(request_factory=self.request_factory, verify=self.verify, **action_dict)
+            actions.append(siren_action)
+
+        links = []  # odd that multiple links can have the same relationship and that because this is a list we could have overloading?? this will break python!
+        for links_dict in entity_dict.get('links', []):
+            link = self._construct_link(links_dict)
+            links.append(link)
+
+        entities = []
+        for entities_dict in entity_dict.get('entities', []):
+            try:  # Try it as a link style subentity
+                entity = self._construct_link(entities_dict)
+            except KeyError:  # otherwise assume it is a full subentity
+                entity = self._construct_entity(entities_dict)
+            entities.append(entity)
+
+        siren_entity = SirenEntity(classnames=classname, properties=properties, actions=actions,
+                                   links=links, entities=entities, verify=self.verify,
+                                   request_factory=self.request_factory)
+        return siren_entity
 
     def _construct_link(self, links_dict):
         """
@@ -116,9 +132,7 @@ class SirenBuilder(RequestMixin):
         """
         rel = links_dict['rel']
         href = links_dict['href']
-        link = SirenLink(rel=rel, href=href)
-        link.verify = self.verify
-        link.request_factory = self.request_factory
+        link = SirenLink(rel=rel, href=href, verify=self.verify, request_factory=self.request_factory)
         return link
 
 class SirenEntity(RequestMixin):
@@ -290,7 +304,7 @@ class SirenEntity(RequestMixin):
 class SirenAction(RequestMixin):
     """Representation of a Siren Action element. Actions are operations on a hypermedia instance or class level."""
 
-    def __init__(self, name, href, type, fields=None, title=None, method='GET', verify=False, request_factory=GzipRequest):
+    def __init__(self, name, href, type, fields=None, title=None, method='GET', verify=False, request_factory=GzipRequest, **kwargs):
         """
         Constructor.
 
@@ -308,6 +322,7 @@ class SirenAction(RequestMixin):
         :type method: str
         :param request_factory: constructor for request objects
         :type type or function
+        :param dict kwargs:  Extra stuff to ignore for now.
         """
         self.name = name
         self.title = title
@@ -315,8 +330,7 @@ class SirenAction(RequestMixin):
         self.href = href
         self.type = type
         self.fields = fields if fields else []
-        self.verify = verify
-        self.request_factory = request_factory
+        super(SirenAction, self).__init__(request_factory=request_factory, verify=verify)
 
     @staticmethod
     def create_field(name, type=None, value=None):
