@@ -10,6 +10,7 @@ from requests import Response
 
 import json
 import mock
+import six
 import unittest2
 
 
@@ -80,3 +81,58 @@ class TestSirenBuilder(unittest2.TestCase):
     def test_from_api_response_bad_type(self):
         builder = SirenBuilder()
         self.assertRaises(TypeError, builder.from_api_response, [])
+
+
+class TestSirenEntity(unittest2.TestCase):
+    def test_init_no_classnames(self):
+        self.assertRaises(ValueError, SirenEntity, None, None)
+        self.assertRaises(ValueError, SirenEntity, [], None)
+
+    def test_get_link_no_links(self):
+        entity = SirenEntity(['blah'], None)
+        self.assertIsNone(entity.get_link('sakdf'))
+
+    def test_get_link(self):
+        link = mock.Mock(rel=['myrel'])
+        entity = SirenEntity(['blah'], [link])
+        resp = entity.get_link('myrel')
+        self.assertEqual(link, resp)
+        self.assertIsNone(entity.get_link('badrel'))
+
+    def test_get_entity_no_entities(self):
+        entity = SirenEntity(['blah'], None)
+        self.assertEqual(entity.get_entities('sakdf'), [])
+
+    def test_get_entities(self):
+        ent = mock.Mock(rel=['myrel'])
+        entity = SirenEntity(['blah'], [ent])
+        resp = entity.get_link('myrel')
+        self.assertEqual(ent, resp)
+        self.assertEqual(entity.get_entities('badrel'), [])
+
+    def test_get_primary_classname(self):
+        entity = SirenEntity(['blah'], None)
+        self.assertEqual(entity.get_primary_classname(), 'blah')
+
+    def test_get_base_classnames(self):
+        entity = SirenEntity(['blah'], None)
+        self.assertListEqual(entity.get_base_classnames(), [])
+        entity = SirenEntity(['blah', 'second'], None)
+        self.assertListEqual(entity.get_base_classnames(), ['second'])
+
+    def test_as_siren(self):
+        entity = SirenEntity(['blah'], [])
+        siren_dict = entity.as_siren()
+        self.assertIsInstance(siren_dict, dict)
+        self.assertDictEqual(siren_dict, {'class': ['blah'], 'links': [], 'entities': [], 'actions': [], 'properties': {}})
+
+    def test_as_json(self):
+        entity = SirenEntity(['blah'], [])
+        json_string = entity.as_json()
+        self.assertIsInstance(json_string, six.string_types)
+
+    def test_as_python_object(self):
+        entity = SirenEntity(['blah'], [])
+        siren_class = entity.as_python_object()
+        self.assertTrue(hasattr(siren_class, 'get_entities'))
+        # TODO we definitely need some more tests for this part.

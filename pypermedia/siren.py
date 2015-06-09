@@ -157,6 +157,7 @@ class SirenEntity(RequestMixin):
         :type properties:
         :param actions: actions that can be performed on an instance or object class
         :type actions:
+        :raises: ValueError
         """
         super(SirenEntity, self).__init__(**kwargs)
         if not classnames or len(classnames) == 0:
@@ -164,13 +165,13 @@ class SirenEntity(RequestMixin):
         self.classnames = classnames
 
         self.properties = properties if properties else {}
-        self.actions = actions if actions else {}
+        self.actions = actions if actions else []
 
         # links are supposed to be of size 0 or more because they should contain at least a link to self
         # this is not the case for error messages currently so I'm removing this check
         #if not links or len(links) == 0:
         #    raise ValueError('Parameter "links" must have at least one element.')
-        self.links = links  # store this as a dictionary of rel->siren, also ensure that rels are not duplicated
+        self.links = links or [] # store this as a dictionary of rel->siren, also ensure that rels are not duplicated
         self.entities = entities or []
 
     def get_link(self, rel):
@@ -199,7 +200,7 @@ class SirenEntity(RequestMixin):
         :rtype: list
         """
         if not self.entities:
-            return None
+            return []
         return [x for x in self.entities if rel in x.rel]
 
     def get_primary_classname(self):
@@ -218,7 +219,7 @@ class SirenEntity(RequestMixin):
         :return: base classnames
         :rtype: str
         """
-        return self.classnames[1:] if len(self.classnames) > 1 else None
+        return self.classnames[1:] if len(self.classnames) > 1 else []
 
     def as_siren(self):
         """
@@ -227,8 +228,9 @@ class SirenEntity(RequestMixin):
         :return: dictionary representation of this siren entity
         :rtype: dict[str]
         """
-        new_dict = dict(self.__dict__)
+        new_dict = {'class': self.classnames, 'properties': self.properties}
         new_dict['actions'] = map(operator.methodcaller('as_siren'), self.actions)
+        new_dict['entities'] = map(operator.methodcaller('as_siren'), self.entities)
         new_dict['links'] = map(operator.methodcaller('as_siren'), self.links)
         return new_dict
 
@@ -252,13 +254,10 @@ class SirenEntity(RequestMixin):
         ModelClass = type(str(self.get_primary_classname()), (), self.properties)
 
         # NOTE: there is no checking to ensure that over-writing of methods will not occur
-
+        siren_builder = SirenBuilder(verify=self.verify, request_factory=self.request_factory)
         # add actions as methods
         for action in self.actions:
             method_name = SirenEntity._create_python_method_name(action.name)
-            siren_builder = SirenBuilder()
-            siren_builder.verify = self.verify
-            siren_builder.request_factory = self.request_factory
             method_def = _create_action_fn(action, siren_builder)
             setattr(ModelClass, method_name, method_def)
 
@@ -266,9 +265,7 @@ class SirenEntity(RequestMixin):
         for link in self.links:
             for rel in link.rel:
                 method_name = SirenEntity._create_python_method_name(rel)
-                siren_builder = SirenBuilder()
-                siren_builder.verify = self.verify
-                siren_builder.request_factory = self.request_factory
+                siren_builder = SirenBuilder(verify=self.verify, request_factory=self.request_factory)
                 method_def = _create_action_fn(link, siren_builder)
 
                 setattr(ModelClass, method_name, method_def)
