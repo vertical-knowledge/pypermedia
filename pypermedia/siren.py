@@ -14,43 +14,13 @@ from gzip_requests import GzipRequest
 class RequestMixin(object):
     """Values for any request creating object."""
 
-    @property
-    def request_factory(self):
+    def __init__(self, request_factory=GzipRequest, verify=False):
         """
-        Constructor for making requests
-
-        :return: constructor for request objects
-        :rtype: type or function
+        :param type|function request_factory: constructor for request objects
+        :param bool verify: whether ssl certificate validation should occur
         """
-        return self._request_factory
-
-    @request_factory.setter
-    def request_factory(self, value=GzipRequest):
-        """
-        Updates the request_factory value.
-        :param value: constructor for request objects
-        :type value: type or function
-        """
-        self._request_factory = value
-
-    @property
-    def verify(self):
-        """
-        Whether ssl certificate verification should be attempted
-        :return: whether ssl certificate validation should occur
-        :rtype: bool
-        """
-        return self._verify
-
-    @verify.setter
-    def verify(self, value=False):
-        """
-        Updates the verify value.
-
-        :param value: whether ssl certificate validation should occur
-        :type value: bool
-        """
-        self._verify = value
+        self.request_factory = request_factory
+        self.verify = verify
 
 
 class SirenBuilder(RequestMixin):
@@ -151,7 +121,7 @@ class SirenEntity(RequestMixin):
 
     log = logging.getLogger(__name__)
 
-    def __init__(self, classnames, links, properties=None, actions=None, entities=None):
+    def __init__(self, classnames, links, properties=None, actions=None, entities=None, **kwargs):
         """
         Constructor.
 
@@ -164,6 +134,7 @@ class SirenEntity(RequestMixin):
         :param actions: actions that can be performed on an instance or object class
         :type actions:
         """
+        super(SirenEntity, self).__init__(**kwargs)
         if not classnames or len(classnames) == 0:
             raise ValueError('Parameter "classnames" must have at least one element.')
         self.classnames = classnames
