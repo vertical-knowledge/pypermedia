@@ -1,3 +1,8 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 from setuptools import setup, find_packages  # Always prefer setuptools over distutils
 from codecs import open  # To use a consistent encoding
 from os import path
@@ -17,7 +22,8 @@ with open(path.join(here, 'pypermedia', 'VERSION'), encoding='utf-8') as f:
 
 # run-time dependencies, listed here so that they can be shared with test requirements
 install_requirements = [
-    'requests>=2.3.0'
+    'requests>=2.3.0',
+    'six'
 ]
 
 test_requirements = [

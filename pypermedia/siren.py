@@ -1,10 +1,15 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import json
 import logging
 import operator
 import re
 from requests import Response, Session
 
-from gzip_requests import GzipRequest
+from pypermedia.gzip_requests import GzipRequest
 
 
 # =====================================
