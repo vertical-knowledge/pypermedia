@@ -4,13 +4,15 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 from pypermedia.siren import _check_and_decode_response, SirenBuilder, UnexpectedStatusError, \
-    MalformedSirenError, SirenLink, SirenEntity, SirenAction, TemplatedString
+    MalformedSirenError, SirenLink, SirenEntity, SirenAction, TemplatedString, \
+    _create_action_fn
 
 from requests import Response, PreparedRequest
 
 import json
 import mock
 import six
+import types
 import unittest2
 
 
@@ -137,6 +139,22 @@ class TestSirenEntity(unittest2.TestCase):
         self.assertTrue(hasattr(siren_class, 'get_entities'))
         # TODO we definitely need some more tests for this part.
 
+    def test_create_python_method_name(self):
+        original_expected = [
+            ('original', 'original',),
+            ('original func', 'originalfunc',),
+            ('original-func', 'original_func',),
+            ('%bd#$%#$)@c', 'bdc'),
+        ]
+        for original, expected in original_expected:
+            actual = SirenEntity._create_python_method_name(original)
+            self.assertEqual(actual, expected)
+
+    def test_create_python_method_name_invalid(self):
+        bad = ('#$%^#$%&', '', '09345asda',)
+        for name in bad:
+            self.assertRaises(ValueError, SirenEntity._create_python_method_name, name)
+
 
 class TestSirenAction(unittest2.TestCase):
     def test_add_field(self):
@@ -256,3 +274,93 @@ class TestSirenLink(unittest2.TestCase):
         session = mock.MagicMock()
         resp = link.make_request(_session=session)
         self.assertEqual(session.send.call_count, 1)
+
+    def test_as_python_object(self):
+        """
+        Mostly just an explosion test.
+        """
+        link = SirenLink('blah', 'blah')
+        with mock.patch.object(link, 'make_request') as make_request:
+            with mock.patch.object(link, 'from_api_response') as from_api_respons:
+                resp = link.as_python_object()
+                self.assertEqual(make_request.call_count, 1)
+                self.assertEqual(from_api_respons.call_count, 1)
+
+
+class TestTemplatedString(unittest2.TestCase):
+    def test_init(self):
+        base = '/blah/'
+        template = TemplatedString(base)
+        self.assertEqual(len(template.param_dict), 0)
+        base = '/{id}/{pk}/sdf'
+        template = TemplatedString(base)
+        self.assertEqual(len(template.param_dict), 2)
+        self.assertEqual(template.param_dict['id'], '{id}')
+        self.assertEqual(template.param_dict['pk'], '{pk}')
+
+    def test_items(self):
+        base = '/{id}/{pk}/sdf'
+        template = TemplatedString(base)
+        for p in [('id', '{id}'), ('pk', '{pk}')]:
+            self.assertIn(p, template.items())
+
+    def test_unbound_variables(self):
+        base = '/{id}/{pk}/sdf'
+        template = TemplatedString(base)
+        for p in ['id', 'pk']:
+            self.assertIn(p, template.unbound_variables())
+
+    def test_bind(self):
+        base = '/{id}/{pk}/sdf'
+        template = TemplatedString(base)
+        template2 = template.bind(id=1)
+        self.assertEqual(template2.base, '/1/{pk}/sdf')
+        self.assertDictEqual(template2.param_dict, {'pk': '{pk}'})
+
+        template3 = template2.bind(id=1)
+        self.assertEqual(template3.base, '/1/{pk}/sdf')
+        self.assertDictEqual(template3.param_dict, {'pk': '{pk}'})
+
+        template4 = template3.bind(pk=2)
+        self.assertEqual(template4.base, '/1/2/sdf')
+        self.assertDictEqual(template4.param_dict, {})
+
+        template5 = template4.bind(who='asdknf', cares=23)
+        self.assertEqual(template5.base, '/1/2/sdf')
+        self.assertDictEqual(template5.param_dict, {})
+
+    def test_has_unbound_variables(self):
+        base = '/{id}/{pk}/sdf'
+        template = TemplatedString(base)
+        self.assertTrue(template.has_unbound_variables())
+
+        base = '/sdf'
+        template = TemplatedString(base)
+        self.assertFalse(template.has_unbound_variables())
+
+    def test_as_string(self):
+        base = '/{id}/{pk}/sdf'
+        template = TemplatedString(base)
+        self.assertEqual(base, template.as_string())
+
+
+class TestMiscellaneousSiren(unittest2.TestCase):
+    def test_create_action_function(self):
+        action = mock.MagicMock()
+        siren = mock.MagicMock()
+        func = _create_action_fn(action, siren)
+        self.assertIsInstance(func, types.FunctionType)
+        slf = mock.MagicMock()
+        resp = func(slf, blah='ha')
+        self.assertEqual(siren.from_api_response.return_value.as_python_object.return_value, resp)
+        self.assertEqual(action.make_request.return_value, siren.from_api_response.call_args[1]['response'])
+
+    def test_create_action_function_none_response(self):
+        action = mock.MagicMock()
+        siren = mock.MagicMock()
+        siren.from_api_response.return_value = None
+        func = _create_action_fn(action, siren)
+        slf = mock.MagicMock()
+        resp = func(slf, blah='ha')
+        self.assertIsNone(resp)
+

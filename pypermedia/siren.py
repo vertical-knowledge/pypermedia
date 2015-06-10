@@ -5,7 +5,6 @@ from __future__ import unicode_literals
 
 import json
 import logging
-import operator
 import re
 import six
 from requests import Response, Session
@@ -285,9 +284,9 @@ class SirenEntity(RequestMixin):
         :param base_name: base string/name
         :type base_name: str
         :return: valid python method name
-        :rtype: str
+        :rtype: str|unicode
         """
-        name = str(base_name)  # coerce argument
+        name = six.text_type(base_name)  # coerce argument
 
         # normalize value
         name = name.lower()
@@ -498,13 +497,10 @@ class SirenLink(SirenBuilder):
         :raises: ValueError
         """
         if not rel:
-            raise ValueError('Parameter "rel" is required.')
+            raise ValueError('Parameter "rel" is required and must be a string or list of at least one element..')
 
         if isinstance(rel, six.string_types):
             rel = [rel, ]
-
-        if len(rel) == 0:
-            raise ValueError('Parameter "rel" must be a string or list of at least one element.')
         self.rel = list(rel)
 
         if not href or not isinstance(href, six.string_types):
@@ -703,7 +699,7 @@ def _create_action_fn(action, siren_builder, **kwargs):
     :rtype: function
     """
     def _action_fn(self, **kwargs):
-        response = action.make_request(verify=False, **kwargs)  # create request and obtain response
+        response = action.make_request(verify=self.verify, **kwargs)  # create request and obtain response
         siren = siren_builder.from_api_response(response=response)  # interpret response as a siren object
         if not siren:
             return None
