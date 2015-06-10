@@ -5,9 +5,8 @@ from __future__ import unicode_literals
 
 import requests
 import requests.exceptions
-import sys
 
-from pypermedia.gzip_requests import GzipRequest
+# from pypermedia.gzip_requests import GzipRequest
 from pypermedia.siren import SirenBuilder
 
 
@@ -15,7 +14,7 @@ class HypermediaClient(object):
     """Entry-point and helper methods for using the codex service. This performs the initial setup, all other client calls are created dynamically from service responses."""
 
     @staticmethod
-    def connect(root_url, session=None, verify=False, request_factory=GzipRequest, builder=SirenBuilder):
+    def connect(root_url, session=None, verify=False, request_factory=requests.Request, builder=SirenBuilder):
         """
         Creates a client by connecting to the root api url. Pointing to other urls is possible so long as their responses correspond to standard siren-json.
 
@@ -35,7 +34,7 @@ class HypermediaClient(object):
 
     @staticmethod
     def send_and_construct(prepared_request, session=None, verify=False,
-                           request_factory=GzipRequest, builder=SirenBuilder):
+                           request_factory=requests.Request, builder=SirenBuilder):
         """
         Takes a PreparedRequest object and sends it
         and then constructs the SirenObject from the
@@ -58,8 +57,7 @@ class HypermediaClient(object):
         except requests.exceptions.ConnectionError as e:
             # this is the deprecated form but it preserves the stack trace so let's use this
             # it's not like this is going to be a big problem when porting to Python 3 in the future
-            exception = ConnectError('Unable to connect to server! Unable to construct client. root_url="{0}" verify="{1}"'.format(prepared_request.url, verify), e)
-            raise ConnectError, exception, sys.exc_info()[2]
+            raise ConnectError('Unable to connect to server! Unable to construct client. root_url="{0}" verify="{1}"'.format(prepared_request.url, verify), e)
 
         builder = builder(verify=verify, request_factory=request_factory)
         obj = builder.from_api_response(response)

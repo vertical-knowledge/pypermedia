@@ -7,9 +7,7 @@ import json
 import logging
 import re
 import six
-from requests import Response, Session
-
-from pypermedia.gzip_requests import GzipRequest
+from requests import Response, Session, Request
 
 
 # =====================================
@@ -45,7 +43,7 @@ def _check_and_decode_response(response):
 class RequestMixin(object):
     """Values for any request creating object."""
 
-    def __init__(self, request_factory=GzipRequest, verify=False):
+    def __init__(self, request_factory=Request, verify=False):
         """
         :param type|function request_factory: constructor for request objects
         :param bool verify: whether ssl certificate validation should occur
@@ -304,7 +302,7 @@ class SirenEntity(RequestMixin):
 class SirenAction(RequestMixin):
     """Representation of a Siren Action element. Actions are operations on a hypermedia instance or class level."""
 
-    def __init__(self, name, href, type, fields=None, title=None, method='GET', verify=False, request_factory=GzipRequest, **kwargs):
+    def __init__(self, name, href, type, fields=None, title=None, method='GET', verify=False, request_factory=Request, **kwargs):
         """
         Constructor.
 
@@ -474,7 +472,7 @@ class SirenAction(RequestMixin):
             if not v:
                 continue
 
-            if type(v) not in (str, unicode):
+            if not isinstance(v, six.string_types):
                 v = json.dumps(v)
 
             result[k] = v
@@ -484,7 +482,7 @@ class SirenAction(RequestMixin):
 class SirenLink(SirenBuilder):
     """Representation of a Link in Siren. Links are traversals to related objects that exist outside of normal entity (parent-child) ownership."""
 
-    def __init__(self, rel, href, verify=False, request_factory=GzipRequest):
+    def __init__(self, rel, href, verify=False, request_factory=Request):
         """
         Constructor.
 
