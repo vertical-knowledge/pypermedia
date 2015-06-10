@@ -207,3 +207,52 @@ class TestSirenAction(unittest2.TestCase):
         mck = mock.Mock(send=mock.Mock(return_value=True))
         resp = action.make_request(_session=mck, x=1, y=2)
         self.assertTrue(resp)
+        self.assertEqual(mck.send.call_count, 1)
+        self.assertIsInstance(mck.send.call_args[0][0], PreparedRequest)
+
+
+class TestSirenLink(unittest2.TestCase):
+    def test_init_errors(self):
+        self.assertRaises(ValueError, SirenLink, [], 'href')
+        self.assertRaises(ValueError, SirenLink, None, 'href')
+        self.assertRaises(ValueError, SirenLink, ['blah'], '')
+
+    def test_init_rel_string(self):
+        siren_link = SirenLink('blah', 'href')
+        self.assertEqual(['blah'], siren_link.rel)
+
+    def test_add_rel(self):
+        link = SirenLink(['blah'], 'blah')
+        self.assertListEqual(link.rel, ['blah'])
+        link.add_rel('two')
+        self.assertListEqual(['blah', 'two'], link.rel)
+        link.add_rel('two')
+        self.assertListEqual(['blah', 'two'], link.rel)
+
+    def test_rem_rel(self):
+        link = SirenLink(['blah'], 'blah')
+        link.rem_rel('notreal')
+        self.assertListEqual(link.rel, ['blah'])
+        link.rem_rel('blah')
+        self.assertListEqual(link.rel, [])
+
+    def test_as_siren(self):
+        link = SirenLink(['blah'], 'href')
+        self.assertDictEqual(link.as_siren(), dict(rel=['blah'], href='href'))
+
+    def test_as_json(self):
+        link = SirenLink(['blah'], 'href')
+        self.assertIsInstance(link.as_json(), six.string_types)
+
+    def test_as_request(self):
+        href = 'http://notreal.com/'
+        link = SirenLink(['blah'], 'http://notreal.com')
+        req = link.as_request()
+        self.assertIsInstance(req, PreparedRequest)
+        self.assertEqual(href, req.url)
+
+    def test_make_request(self):
+        link = SirenLink(['blah'], 'http://notreal.com')
+        session = mock.MagicMock()
+        resp = link.make_request(_session=session)
+        self.assertEqual(session.send.call_count, 1)

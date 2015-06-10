@@ -495,6 +495,7 @@ class SirenLink(SirenBuilder):
         :type href: str
         :param request_factory: constructor for request objects
         :type type or function
+        :raises: ValueError
         """
         if not rel:
             raise ValueError('Parameter "rel" is required.')
@@ -528,9 +529,9 @@ class SirenLink(SirenBuilder):
         Removes a relationship from this link.
 
         :param cur_rel: pre-existing relationship to remove (note that removing relationships not assigned to this link is a no-op)
-        :type cur_rel: str
+        :type cur_rel: str|unicode
         """
-        if cur_rel not in self.rel:
+        if cur_rel in self.rel:
             self.rel.remove(cur_rel)
 
     def as_siren(self):
@@ -540,14 +541,14 @@ class SirenLink(SirenBuilder):
         :return: siren dictionary representation of the link
         :rtype: dict
         """
-        return dict(self.__dict__)
+        return dict(rel=self.rel, href=self.href)
 
     def as_json(self):
         """
         Returns as a json string a siren-compatible representation of this object.
 
         :return: json-siren
-        :rtype: str
+        :rtype: unicode
         """
         new_dict = self.as_siren()
         return json.dumps(new_dict)
@@ -563,7 +564,7 @@ class SirenLink(SirenBuilder):
         req = self.request_factory('GET', self.href)
         return req.prepare()
 
-    def as_python_object(self, **kwargs):
+    def as_python_object(self, _session=None, **kwargs):
         """
         Constructs the link as a python object by
         first making a request and then constructing the
@@ -573,11 +574,11 @@ class SirenLink(SirenBuilder):
         :return: The SirenEntity constructed from the respons from the api.
         :rtype: SirenEntity
         """
-        resp = self.make_request()
+        resp = self.make_request(_session=_session)
         siren_entity = self.from_api_response(resp)
         return siren_entity.as_python_object()
 
-    def make_request(self, verify=False, **kwfields):
+    def make_request(self, _session=None, **kwfields):
         """
         Performs retrieval of the link from the external server.
 
@@ -585,7 +586,7 @@ class SirenLink(SirenBuilder):
         :return: Request object representation of this action
         :rtype: Request
         """
-        s = Session()
+        s = _session or Session()
         return s.send(self.as_request(**kwfields), verify=self.verify)
 
 
