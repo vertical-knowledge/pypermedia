@@ -310,17 +310,17 @@ class SirenAction(RequestMixin):
         Constructor.
 
         :param name: method name for this action
-        :type name: str
+        :type name: str|unicode
         :param href: url associated with the method
-        :type href: str
+        :type href: str|unicode
         :param type: content-type of the payload
-        :type type: str
+        :type type: str|unicode
         :param fields: list of fields to send with this action/request (parameters, either post or query)
         :type fields: list[dict]
         :param title: descriptive title/in-line documentation for the method
-        :type title: str
+        :type title: str|unicode
         :param method: HTTP verb to use for this action (GET, PUT, POST, PATCH, HEAD, etc.)
-        :type method: str
+        :type method: str|unicode
         :param request_factory: constructor for request objects
         :type type or function
         :param dict kwargs:  Extra stuff to ignore for now.
@@ -360,7 +360,7 @@ class SirenAction(RequestMixin):
         :param value: value assigned to the field (optional)
         :type value: object
         """
-        field = SirenAction.create_field(name, type, value)
+        field = self.create_field(name, type, value)
         self.fields.append(field)
 
     def get_fields_as_dict(self):
@@ -375,6 +375,33 @@ class SirenAction(RequestMixin):
             fields_dict[f['name']] = f.get('value', None)
         return fields_dict
 
+    def _get_bound_href(self, template_class, **kwfields):
+        """
+        Gets the bound href and the
+        remaining variables
+
+        :param dict kwargs:
+        :return: The templated string representing
+            the href and the remaining variables
+            to place in the query or request body.
+        :rtype: str|unicode, dict
+        """
+        # bind template variables
+        # bind and remove these the fields so that they do not get passed on
+        templated_href = template_class(self.href)
+        url_params = dict(kwfields)
+        bound_href = templated_href.bind(**url_params)
+        if bound_href.has_unbound_variables():
+            raise ValueError('Unbound template parameters in url detected! All variables must be specified! Unbound variables: {}'.format(bound_href.unbound_variables()))
+        bound_href = bound_href.as_string()
+
+        url_variables = templated_href.unbound_variables()
+        request_fields = {}
+        for k, v in kwfields.items():
+            if k not in url_variables:  # remove template variables
+                request_fields[k] = v
+        return bound_href, request_fields
+
     def as_siren(self):
         """
         Returns a siren-compatible dictionary representation of this object.
@@ -382,7 +409,8 @@ class SirenAction(RequestMixin):
         :return: siren dictionary representation of the action
         :rtype: dict
         """
-        new_dict = dict(self.__dict__)
+        new_dict = dict(name=self.name, title=self.name, method=self.method,
+                        href=self.href, type=self.type, fields=self.fields)
         return new_dict
 
     def as_json(self):
@@ -403,24 +431,7 @@ class SirenAction(RequestMixin):
         :return: Request object representation of this action
         :rtype: Request
         """
-        # bind template variables
-        # bind and remove these the fields so that they do not get passed on
-        templated_href = TemplatedString(self.href)
-        import urllib
-        url_params = {}
-        for k, v in kwfields.items():
-            if isinstance(v, six.string_types):
-                url_params[k] = urllib.quote_plus(v)
-        bound_href = templated_href.bind(**url_params)
-        if bound_href.has_unbound_variables():
-            raise ValueError('Unbound template parameters in url detected! All variables must be specified! Unbound variables: {}'.format(bound_href.unbound_variables()))
-        bound_href = bound_href.as_string()
-
-        url_variables = templated_href.unbound_variables()
-        request_fields = {}
-        for k, v in kwfields.items():
-            if k not in url_variables:  # remove template variables
-                request_fields[k] = v
+        bound_href, request_fields = self._get_bound_href(TemplatedString, **kwfields)
 
         # update query/post parameters specified from sirenaction with remaining arg values (we ignore anything not specified for the action)
         fields = self.get_fields_as_dict()
@@ -439,7 +450,7 @@ class SirenAction(RequestMixin):
 
         return req.prepare()
 
-    def make_request(self, verify=False, **kwfields):
+    def make_request(self, _session=None, **kwfields):
         """
         Performs the request.
 
@@ -447,7 +458,7 @@ class SirenAction(RequestMixin):
         :return: response from the server
         :rtype: Response
         """
-        s = Session()
+        s = _session or Session()
         return s.send(self.as_request(**kwfields), verify=self.verify)
 
     @staticmethod
@@ -654,7 +665,7 @@ class TemplatedString(object):
             if not template:
                 continue
 
-            bound_string = bound_string.replace(template, str(param_val))  # use value to perform replacement
+            bound_string = bound_string.replace(template, six.text_type(param_val))  # use value to perform replacement
 
         return TemplatedString(bound_string)
 

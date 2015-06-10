@@ -4,9 +4,9 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 from pypermedia.siren import _check_and_decode_response, SirenBuilder, UnexpectedStatusError, \
-    MalformedSirenError, SirenLink, SirenEntity
+    MalformedSirenError, SirenLink, SirenEntity, SirenAction, TemplatedString
 
-from requests import Response
+from requests import Response, PreparedRequest
 
 import json
 import mock
@@ -136,3 +136,74 @@ class TestSirenEntity(unittest2.TestCase):
         siren_class = entity.as_python_object()
         self.assertTrue(hasattr(siren_class, 'get_entities'))
         # TODO we definitely need some more tests for this part.
+
+
+class TestSirenAction(unittest2.TestCase):
+    def test_add_field(self):
+        action = SirenAction('action', 'blah', 'application/json')
+        self.assertEqual(action.fields, [])
+        action.add_field('field')
+        self.assertEqual(len(action.fields), 1)
+        self.assertDictEqual(action.fields[0], dict(name='field', type=None, value=None))
+
+    def test_get_fields_dict(self):
+        action = SirenAction('action', 'blah', 'application/json',
+                             fields=[dict(name='field', type=None, value='whocares')])
+        field_dict = action.get_fields_as_dict()
+        self.assertDictEqual(dict(field='whocares'), field_dict)
+
+    def test_as_siren(self):
+        action = SirenAction('action', 'blah', 'application/json')
+        siren_action = action.as_siren()
+        expected = {'href': u'blah', 'name': u'action', 'title': u'action',
+                    'fields': [], 'type': u'application/json', 'method': u'GET'}
+        self.assertDictEqual(siren_action, expected)
+
+    def test_as_json(self):
+        action = SirenAction('action', 'blah', 'application/json')
+        siren_action = action.as_json()
+        self.assertIsInstance(siren_action, six.string_types)
+
+    def test_get_bound_href(self):
+        action = SirenAction('action', 'blah', 'application/json')
+        bound_href, request_fields = action._get_bound_href(TemplatedString, x=1, y=2)
+        self.assertEqual(bound_href, 'blah')
+        self.assertDictEqual(request_fields, dict(x=1, y=2))
+
+    def test_get_bound_href_with_template(self):
+        action = SirenAction('action', 'http://host.com/{id}/{id}', 'application/json')
+        bound_href, request_fields = action._get_bound_href(TemplatedString, x=1, y=2, id=3)
+        self.assertEqual(bound_href, 'http://host.com/3/3')
+        self.assertDictEqual(dict(x=1, y=2), request_fields)
+
+    def test_get_bound_href_unboud_variables(self):
+        action = SirenAction('action', 'http://host.com/{id}/{id}', 'application/json')
+        self.assertRaises(ValueError, action._get_bound_href, TemplatedString, x=1, y=2)
+
+    def test_as_request_get(self):
+        action = SirenAction('action', 'http://blah.com', 'application/json')
+        resp = action.as_request(x=1, y=2)
+        self.assertIsInstance(resp, PreparedRequest)
+        self.assertEqual(resp.method, 'GET')
+        self.assertIn('y=2', resp.path_url)
+        self.assertIn('x=1', resp.path_url)
+
+    def test_as_request_post(self):
+        action = SirenAction('action', 'http://blah.com', 'application/json', method='POST')
+        resp = action.as_request(x=1, y=2)
+        self.assertIsInstance(resp, PreparedRequest)
+        self.assertEqual(resp.method, 'POST')
+        self.assertEqual('/', resp.path_url)
+
+    def test_as_request_delete(self):
+        action = SirenAction('action', 'http://blah.com', 'application/json', method='DELETE')
+        resp = action.as_request(x=1, y=2)
+        self.assertIsInstance(resp, PreparedRequest)
+        self.assertEqual(resp.method, 'DELETE')
+        self.assertEqual('/', resp.path_url)
+
+    def test_make_request(self):
+        action = SirenAction('action', 'http://blah.com', 'application/json')
+        mck = mock.Mock(send=mock.Mock(return_value=True))
+        resp = action.make_request(_session=mck, x=1, y=2)
+        self.assertTrue(resp)
