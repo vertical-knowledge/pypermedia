@@ -69,6 +69,8 @@ class SirenBuilder(RequestMixin):
         # get string
         if isinstance(response, Response):
             response = _check_and_decode_response(response)
+            if response is None:
+                return None
 
         # convert to dict
         if isinstance(response, six.string_types):
@@ -302,7 +304,7 @@ class SirenEntity(RequestMixin):
 class SirenAction(RequestMixin):
     """Representation of a Siren Action element. Actions are operations on a hypermedia instance or class level."""
 
-    def __init__(self, name, href, type, fields=None, title=None, method='GET', verify=False, request_factory=Request, **kwargs):
+    def __init__(self, name, href, type='application/json', fields=None, title=None, method='GET', verify=False, request_factory=Request, **kwargs):
         """
         Constructor.
 
@@ -697,7 +699,7 @@ def _create_action_fn(action, siren_builder, **kwargs):
     :rtype: function
     """
     def _action_fn(self, **kwargs):
-        response = action.make_request(verify=self.verify, **kwargs)  # create request and obtain response
+        response = action.make_request(verify=siren_builder.verify, **kwargs)  # create request and obtain response
         siren = siren_builder.from_api_response(response=response)  # interpret response as a siren object
         if not siren:
             return None
