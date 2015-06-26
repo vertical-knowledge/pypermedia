@@ -1,5 +1,4 @@
 include DESCRIPTION.rst
-recursive-include vk_hypermedia_client VERSION
 
 # Include the test suite (FIXME: does not work yet)
 # recursive-include tests *

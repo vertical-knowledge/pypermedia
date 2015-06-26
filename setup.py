@@ -1,3 +1,8 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 from setuptools import setup, find_packages  # Always prefer setuptools over distutils
 from codecs import open  # To use a consistent encoding
 from os import path
@@ -12,16 +17,18 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'DESCRIPTION.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
-with open(path.join(here, 'pypermedia', 'VERSION'), encoding='utf-8') as f:
-    version = f.read().strip()
+version = '0.3.0'  # For when you integrate zest.releaser.
 
 # run-time dependencies, listed here so that they can be shared with test requirements
 install_requirements = [
-    'requests>=2.3.0'
+    'requests>=2.3.0',
+    'six'
 ]
 
 test_requirements = [
-    'pytest'
+    'mock',
+    'pytest',
+    'unittest2'
 ] + install_requirements
 
 
@@ -53,14 +60,11 @@ setup(
 
     keywords='client rest hypermedia http proxy siren api hateoas',
 
-    packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
+    packages=find_packages(include=['pypermedia', 'pypermedia.*', 'tests', 'tests.*']),
 
     install_requires=install_requirements,
     tests_require=test_requirements,
-
-    package_data={
-        'pypermedia': ['VERSION'],
-    },
+    test_suite='tests'
 
     # Although 'package_data' is the preferred approach, in some case you may
     # need to place model files outside of your packages.

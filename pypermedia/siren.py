@@ -1,56 +1,55 @@
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+from __future__ import unicode_literals
+
 import json
 import logging
-import operator
 import re
-from requests import Response, Session
-
-from gzip_requests import GzipRequest
+import six
+from requests import Response, Session, Request
 
 
 # =====================================
 # Siren element->object representations
 # =====================================
 
+
+def _check_and_decode_response(response):
+    """
+    Checks if the response is valid.  If it is,
+    it returns the response body.  Otherwise
+    it raises an exception or returns None if
+    the status_code is 404.
+
+    :param Response response: The response to check
+    :return: The response body if appropriate.
+    :rtype: unicode
+    """
+    # not found is equivalent to none
+    if response.status_code == 404:
+        return None
+
+    # return none when the code is errant, we should log this as well
+    if response.status_code > 299 or response.status_code < 200:
+        raise UnexpectedStatusError(message='Received an unexpected status code of "{0}"! Unable to construct siren objects.'.format(response.status_code))
+
+    response = response.text
+    if not response:
+        raise MalformedSirenError(message='Parameter "response" object had empty response content. Unable to construct siren objects.')
+    return response
+
+
 class RequestMixin(object):
     """Values for any request creating object."""
 
-    @property
-    def request_factory(self):
+    def __init__(self, request_factory=Request, verify=False):
         """
-        Constructor for making requests
-
-        :return: constructor for request objects
-        :rtype: type or function
+        :param type|function request_factory: constructor for request objects
+        :param bool verify: whether ssl certificate validation should occur
         """
-        return self._request_factory
-
-    @request_factory.setter
-    def request_factory(self, value=GzipRequest):
-        """
-        Updates the request_factory value.
-        :param value: constructor for request objects
-        :type value: type or function
-        """
-        self._request_factory = value
-
-    @property
-    def verify(self):
-        """
-        Whether ssl certificate verification should be attempted
-        :return: whether ssl certificate validation should occur
-        :rtype: bool
-        """
-        return self._verify
-
-    @verify.setter
-    def verify(self, value=False):
-        """
-        Updates the verify value.
-
-        :param value: whether ssl certificate validation should occur
-        :type value: bool
-        """
-        self._verify = value
+        self.request_factory = request_factory
+        self.verify = verify
 
 
 class SirenBuilder(RequestMixin):
@@ -64,23 +63,15 @@ class SirenBuilder(RequestMixin):
         :type response: str or unicode or requests.Response
         :return: siren entity graph
         :rtype: SirenEntity
+        :raises: MalformedSirenError
+        :raises: TypeError
         """
         # get string
-        if type(response) is Response:
-            # not found is equivalent to none
-            if response.status_code == 404:
-                return None
-
-            # return none when the code is errant, we should log this as well
-            if response.status_code > 299 or response.status_code < 200:
-                raise UnexpectedStatusError(message='Received an unexpected status code of "{}"! Unable to construct siren objects.'.format(response.status_code))
-
-            response = response.text
-            if not response:
-                raise MalformedSirenError(message='Parameter "response" object had empty response content. Unable to construct siren objects.')
+        if isinstance(response, Response):
+            response = _check_and_decode_response(response)
 
         # convert to dict
-        if type(response) in (str, unicode):
+        if isinstance(response, six.string_types):
             try:
                 response = json.loads(response)
             except ValueError as e:
@@ -91,41 +82,59 @@ class SirenBuilder(RequestMixin):
             raise TypeError('Siren object construction requires a valid response, json, or dict object.')
 
         try:
-            # let's get rolling!
-            classname = response['class']
-            properties = response.get('properties', {})
-
-            actions = []  # odd that multiple actions can have the same name, is this for overloading? it will break python!
-            for action_dict in response.get('actions', {}):
-                params = {
-                    'name': action_dict['name'],
-                    'title': action_dict.get('title'),
-                    'method': action_dict['method'],
-                    'href': action_dict['href'],
-                    'type': action_dict.get('type'),
-                    'fields': action_dict.get('fields')
-                }
-                siren_action = SirenAction(**params)
-                siren_action.verify = self.verify
-                siren_action.request_factory = self.request_factory
-                actions.append(siren_action)
-
-            links = []  # odd that multiple links can have the same relationship and that because this is a list we could have overloading?? this will break python!
-            for links_dict in response.get('links', {}):
-                rel = links_dict['rel']
-                href = links_dict['href']
-                link = SirenLink(rel=rel, href=href)
-                link.verify = self.verify
-                link.request_factory = self.request_factory
-                links.append(link)
-
-            siren_entity = SirenEntity(classnames=classname, properties=properties, actions=actions, links=links)
-            siren_entity.verify = self.verify
-            siren_entity.request_factory = self.request_factory
-
-            return siren_entity
+            return self._construct_entity(response)
         except Exception as e:
             raise MalformedSirenError(message='Siren response is malformed and is missing one or more required values. Unable to create python object representation.', errors=e)
+
+    def _construct_entity(self, entity_dict):
+        """
+        Constructs an entity from a dictionary. Used
+        for both entities and embedded sub-entities.
+
+        :param dict entity_dict:
+        :return: The SirenEntity representing the object
+        :rtype: SirenEntity
+        :raises KeyError
+        """
+        classname = entity_dict['class']
+        properties = entity_dict.get('properties', {})
+
+        actions = []  # odd that multiple actions can have the same name, is this for overloading? it will break python!
+        for action_dict in entity_dict.get('actions', []):
+            siren_action = SirenAction(request_factory=self.request_factory, verify=self.verify, **action_dict)
+            actions.append(siren_action)
+
+        links = []  # odd that multiple links can have the same relationship and that because this is a list we could have overloading?? this will break python!
+        for links_dict in entity_dict.get('links', []):
+            link = self._construct_link(links_dict)
+            links.append(link)
+
+        entities = []
+        for entities_dict in entity_dict.get('entities', []):
+            try:  # Try it as a link style subentity
+                entity = self._construct_link(entities_dict)
+            except KeyError:  # otherwise assume it is a full subentity
+                entity = self._construct_entity(entities_dict)
+            entities.append(entity)
+
+        siren_entity = SirenEntity(classnames=classname, properties=properties, actions=actions,
+                                   links=links, entities=entities, verify=self.verify,
+                                   request_factory=self.request_factory)
+        return siren_entity
+
+    def _construct_link(self, links_dict):
+        """
+        Constructs a link from the links dictionary.
+
+        :param dict links_dict: A dictionary include a {key: list, href: unicode}
+        :return: A SirenLink representing the link
+        :rtype: SirenLink
+        :raises: KeyError
+        """
+        rel = links_dict['rel']
+        href = links_dict['href']
+        link = SirenLink(rel=rel, href=href, verify=self.verify, request_factory=self.request_factory)
+        return link
 
 
 class SirenEntity(RequestMixin):
@@ -133,7 +142,7 @@ class SirenEntity(RequestMixin):
 
     log = logging.getLogger(__name__)
 
-    def __init__(self, classnames, links, properties=None, actions=None):
+    def __init__(self, classnames, links, properties=None, actions=None, entities=None, **kwargs):
         """
         Constructor.
 
@@ -145,21 +154,24 @@ class SirenEntity(RequestMixin):
         :type properties:
         :param actions: actions that can be performed on an instance or object class
         :type actions:
+        :raises: ValueError
         """
+        super(SirenEntity, self).__init__(**kwargs)
         if not classnames or len(classnames) == 0:
             raise ValueError('Parameter "classnames" must have at least one element.')
         self.classnames = classnames
 
         self.properties = properties if properties else {}
-        self.actions = actions if actions else {}
+        self.actions = actions if actions else []
 
         # links are supposed to be of size 0 or more because they should contain at least a link to self
         # this is not the case for error messages currently so I'm removing this check
         #if not links or len(links) == 0:
         #    raise ValueError('Parameter "links" must have at least one element.')
-        self.links = links  # store this as a dictionary of rel->siren, also ensure that rels are not duplicated
+        self.links = links or [] # store this as a dictionary of rel->siren, also ensure that rels are not duplicated
+        self.entities = entities or []
 
-    def get_link(self, rel):
+    def get_links(self, rel):
         """
         Obtains a link based upon relationship value.
 
@@ -171,8 +183,21 @@ class SirenEntity(RequestMixin):
         if not self.links:
             return None
 
-        link = next((x for x in self.links if rel in x.rel), None)  # should change this so that links are added to an internal dictionary? this seems like a flaw in siren
-        return link
+        return [x for x in self.links if rel in x.rel]  # should change this so that links are added to an internal dictionary? this seems like a flaw in siren
+
+    def get_entities(self, rel):
+        """
+        Obtains an entity based upon the relationship
+        value.
+
+        :param rel: relationship between this entity and the linked resource
+        :type rel: str
+        :return: link to the resource with the specified relationship
+        :rtype: list
+        """
+        if not self.entities:
+            return []
+        return [x for x in self.entities if rel in x.rel]
 
     def get_primary_classname(self):
         """
@@ -190,8 +215,7 @@ class SirenEntity(RequestMixin):
         :return: base classnames
         :rtype: str
         """
-        return self.classnames[1:] if len(self.classnames) > 1 else None
-
+        return self.classnames[1:] if len(self.classnames) > 1 else []
 
     def as_siren(self):
         """
@@ -200,9 +224,10 @@ class SirenEntity(RequestMixin):
         :return: dictionary representation of this siren entity
         :rtype: dict[str]
         """
-        new_dict = dict(self.__dict__)
-        new_dict['actions'] = map(operator.methodcaller('as_siren'), self.actions)
-        new_dict['links'] = map(operator.methodcaller('as_siren'), self.links)
+        new_dict = {'class': self.classnames, 'properties': self.properties}
+        new_dict['actions'] = [action.as_siren() for action in self.actions]
+        new_dict['entities'] = [entity.as_siren() for entity in self.entities]
+        new_dict['links'] = [link.as_siren() for link in self.links]
         return new_dict
 
     def as_json(self):
@@ -225,13 +250,10 @@ class SirenEntity(RequestMixin):
         ModelClass = type(str(self.get_primary_classname()), (), self.properties)
 
         # NOTE: there is no checking to ensure that over-writing of methods will not occur
-
+        siren_builder = SirenBuilder(verify=self.verify, request_factory=self.request_factory)
         # add actions as methods
         for action in self.actions:
             method_name = SirenEntity._create_python_method_name(action.name)
-            siren_builder = SirenBuilder()
-            siren_builder.verify = self.verify
-            siren_builder.request_factory = self.request_factory
             method_def = _create_action_fn(action, siren_builder)
             setattr(ModelClass, method_name, method_def)
 
@@ -239,12 +261,16 @@ class SirenEntity(RequestMixin):
         for link in self.links:
             for rel in link.rel:
                 method_name = SirenEntity._create_python_method_name(rel)
-                siren_builder = SirenBuilder()
-                siren_builder.verify = self.verify
-                siren_builder.request_factory = self.request_factory
+                siren_builder = SirenBuilder(verify=self.verify, request_factory=self.request_factory)
                 method_def = _create_action_fn(link, siren_builder)
 
                 setattr(ModelClass, method_name, method_def)
+
+        def get_entity(obj, rel):
+            matching_entities = self.get_entities(rel) or []
+            for x in matching_entities:
+                yield x.as_python_object()
+        setattr(ModelClass, 'get_entities', get_entity)
 
         return ModelClass()
 
@@ -256,9 +282,9 @@ class SirenEntity(RequestMixin):
         :param base_name: base string/name
         :type base_name: str
         :return: valid python method name
-        :rtype: str
+        :rtype: str|unicode
         """
-        name = str(base_name)  # coerce argument
+        name = six.text_type(base_name)  # coerce argument
 
         # normalize value
         name = name.lower()
@@ -276,24 +302,25 @@ class SirenEntity(RequestMixin):
 class SirenAction(RequestMixin):
     """Representation of a Siren Action element. Actions are operations on a hypermedia instance or class level."""
 
-    def __init__(self, name, href, type, fields=None, title=None, method='GET', verify=False, request_factory=GzipRequest):
+    def __init__(self, name, href, type, fields=None, title=None, method='GET', verify=False, request_factory=Request, **kwargs):
         """
         Constructor.
 
         :param name: method name for this action
-        :type name: str
+        :type name: str|unicode
         :param href: url associated with the method
-        :type href: str
+        :type href: str|unicode
         :param type: content-type of the payload
-        :type type: str
+        :type type: str|unicode
         :param fields: list of fields to send with this action/request (parameters, either post or query)
         :type fields: list[dict]
         :param title: descriptive title/in-line documentation for the method
-        :type title: str
+        :type title: str|unicode
         :param method: HTTP verb to use for this action (GET, PUT, POST, PATCH, HEAD, etc.)
-        :type method: str
+        :type method: str|unicode
         :param request_factory: constructor for request objects
         :type type or function
+        :param dict kwargs:  Extra stuff to ignore for now.
         """
         self.name = name
         self.title = title
@@ -301,8 +328,7 @@ class SirenAction(RequestMixin):
         self.href = href
         self.type = type
         self.fields = fields if fields else []
-        self.verify = verify
-        self.request_factory = request_factory
+        super(SirenAction, self).__init__(request_factory=request_factory, verify=verify)
 
     @staticmethod
     def create_field(name, type=None, value=None):
@@ -331,7 +357,7 @@ class SirenAction(RequestMixin):
         :param value: value assigned to the field (optional)
         :type value: object
         """
-        field = SirenAction.create_field(name, type, value)
+        field = self.create_field(name, type, value)
         self.fields.append(field)
 
     def get_fields_as_dict(self):
@@ -341,7 +367,37 @@ class SirenAction(RequestMixin):
         :return: dictionary of field key/value pairs that will be sent with this action.
         :rtype: dict[str, object]
         """
-        return {f['name']: f.get('value', None) for f in self.fields}
+        fields_dict = {}
+        for f in self.fields:
+            fields_dict[f['name']] = f.get('value', None)
+        return fields_dict
+
+    def _get_bound_href(self, template_class, **kwfields):
+        """
+        Gets the bound href and the
+        remaining variables
+
+        :param dict kwargs:
+        :return: The templated string representing
+            the href and the remaining variables
+            to place in the query or request body.
+        :rtype: str|unicode, dict
+        """
+        # bind template variables
+        # bind and remove these the fields so that they do not get passed on
+        templated_href = template_class(self.href)
+        url_params = dict(kwfields)
+        bound_href = templated_href.bind(**url_params)
+        if bound_href.has_unbound_variables():
+            raise ValueError('Unbound template parameters in url detected! All variables must be specified! Unbound variables: {}'.format(bound_href.unbound_variables()))
+        bound_href = bound_href.as_string()
+
+        url_variables = templated_href.unbound_variables()
+        request_fields = {}
+        for k, v in kwfields.items():
+            if k not in url_variables:  # remove template variables
+                request_fields[k] = v
+        return bound_href, request_fields
 
     def as_siren(self):
         """
@@ -350,7 +406,8 @@ class SirenAction(RequestMixin):
         :return: siren dictionary representation of the action
         :rtype: dict
         """
-        new_dict = dict(self.__dict__)
+        new_dict = dict(name=self.name, title=self.name, method=self.method,
+                        href=self.href, type=self.type, fields=self.fields)
         return new_dict
 
     def as_json(self):
@@ -371,18 +428,7 @@ class SirenAction(RequestMixin):
         :return: Request object representation of this action
         :rtype: Request
         """
-        # bind template variables
-        # bind and remove these the fields so that they do not get passed on
-        templated_href = TemplatedString(self.href)
-        import urllib
-        url_params = {key: urllib.quote_plus(val) for key, val in kwfields.items() if type(val) in (str, unicode)}
-        bound_href = templated_href.bind(**url_params)
-        if bound_href.has_unbound_variables():
-            raise ValueError('Unbound template parameters in url detected! All variables must be specified! Unbound variables: {}'.format(bound_href.unbound_variables()))
-        bound_href = bound_href.as_string()
-
-        url_variables = templated_href.unbound_variables()
-        request_fields = {k: v for k, v in kwfields.items() if k not in url_variables}  # remove template variables
+        bound_href, request_fields = self._get_bound_href(TemplatedString, **kwfields)
 
         # update query/post parameters specified from sirenaction with remaining arg values (we ignore anything not specified for the action)
         fields = self.get_fields_as_dict()
@@ -394,12 +440,14 @@ class SirenAction(RequestMixin):
         # depending upon the method we need to use params or data for field transmission
         if self.method == 'GET':
             req = self.request_factory(self.method, bound_href, params=fields)
-        elif self.method == 'PUT' or self.method == 'POST':
+        elif self.method in ['PUT', 'POST', 'PATCH']:
             req = self.request_factory(self.method, bound_href, data=fields)
+        else:
+            req = self.request_factory(self.method, bound_href)
 
         return req.prepare()
 
-    def make_request(self, verify=False, **kwfields):
+    def make_request(self, _session=None, **kwfields):
         """
         Performs the request.
 
@@ -407,7 +455,7 @@ class SirenAction(RequestMixin):
         :return: response from the server
         :rtype: Response
         """
-        s = Session()
+        s = _session or Session()
         return s.send(self.as_request(**kwfields), verify=self.verify)
 
     @staticmethod
@@ -424,17 +472,17 @@ class SirenAction(RequestMixin):
             if not v:
                 continue
 
-            if type(v) not in (str, unicode):
+            if not isinstance(v, six.string_types):
                 v = json.dumps(v)
 
             result[k] = v
         return result
 
 
-class SirenLink(RequestMixin):
+class SirenLink(SirenBuilder):
     """Representation of a Link in Siren. Links are traversals to related objects that exist outside of normal entity (parent-child) ownership."""
 
-    def __init__(self, rel, href, verify=False, request_factory=GzipRequest):
+    def __init__(self, rel, href, verify=False, request_factory=Request):
         """
         Constructor.
 
@@ -444,18 +492,16 @@ class SirenLink(RequestMixin):
         :type href: str
         :param request_factory: constructor for request objects
         :type type or function
+        :raises: ValueError
         """
         if not rel:
-            raise ValueError('Parameter "rel" is required.')
+            raise ValueError('Parameter "rel" is required and must be a string or list of at least one element..')
 
-        if type(rel) in (str, unicode):
+        if isinstance(rel, six.string_types):
             rel = [rel, ]
-
-        if len(rel) == 0:
-            raise ValueError('Parameter "rel" must be a string or list of at least one element.')
         self.rel = list(rel)
 
-        if not href and type(href) not in (str, unicode):
+        if not href or not isinstance(href, six.string_types):
             raise ValueError('Parameter "href" must be a string.')
         self.href = href
 
@@ -477,9 +523,9 @@ class SirenLink(RequestMixin):
         Removes a relationship from this link.
 
         :param cur_rel: pre-existing relationship to remove (note that removing relationships not assigned to this link is a no-op)
-        :type cur_rel: str
+        :type cur_rel: str|unicode
         """
-        if cur_rel not in self.rel:
+        if cur_rel in self.rel:
             self.rel.remove(cur_rel)
 
     def as_siren(self):
@@ -489,14 +535,14 @@ class SirenLink(RequestMixin):
         :return: siren dictionary representation of the link
         :rtype: dict
         """
-        return dict(self.__dict__)
+        return dict(rel=self.rel, href=self.href)
 
     def as_json(self):
         """
         Returns as a json string a siren-compatible representation of this object.
 
         :return: json-siren
-        :rtype: str
+        :rtype: unicode
         """
         new_dict = self.as_siren()
         return json.dumps(new_dict)
@@ -512,7 +558,21 @@ class SirenLink(RequestMixin):
         req = self.request_factory('GET', self.href)
         return req.prepare()
 
-    def make_request(self, verify=False, **kwfields):
+    def as_python_object(self, _session=None, **kwargs):
+        """
+        Constructs the link as a python object by
+        first making a request and then constructing the
+        corresponding object.
+
+        :param kwfields: query/post parameters to add to the request, parameter type depends upon HTTP verb in use  # limitation of siren
+        :return: The SirenEntity constructed from the respons from the api.
+        :rtype: SirenEntity
+        """
+        resp = self.make_request(_session=_session)
+        siren_entity = self.from_api_response(resp)
+        return siren_entity.as_python_object()
+
+    def make_request(self, _session=None, **kwfields):
         """
         Performs retrieval of the link from the external server.
 
@@ -520,7 +580,7 @@ class SirenLink(RequestMixin):
         :return: Request object representation of this action
         :rtype: Request
         """
-        s = Session()
+        s = _session or Session()
         return s.send(self.as_request(**kwfields), verify=self.verify)
 
 
@@ -562,7 +622,9 @@ class TemplatedString(object):
         # locate parameters
         param_locator = re.compile('\{[^}]+\}')
         params = param_locator.findall(self.base)
-        self.param_dict = {p.replace('{', '').replace('}', ''): p for p in params}
+        self.param_dict = {}
+        for p in params:
+            self.param_dict[p.replace('{', '').replace('}', '')] = p
 
     def items(self):
         """
@@ -598,7 +660,7 @@ class TemplatedString(object):
             if not template:
                 continue
 
-            bound_string = bound_string.replace(template, str(param_val))  # use value to perform replacement
+            bound_string = bound_string.replace(template, six.text_type(param_val))  # use value to perform replacement
 
         return TemplatedString(bound_string)
 
@@ -635,7 +697,7 @@ def _create_action_fn(action, siren_builder, **kwargs):
     :rtype: function
     """
     def _action_fn(self, **kwargs):
-        response = action.make_request(verify=False, **kwargs)  # create request and obtain response
+        response = action.make_request(verify=self.verify, **kwargs)  # create request and obtain response
         siren = siren_builder.from_api_response(response=response)  # interpret response as a siren object
         if not siren:
             return None

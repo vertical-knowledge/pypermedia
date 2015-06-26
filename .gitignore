@@ -55,3 +55,9 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# PyCharm files
+ .idea
+
+# Passwords will get stored in setup.cfg  Dont include taht
+setup.cfg

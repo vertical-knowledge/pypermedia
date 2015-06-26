@@ -1,0 +1,15 @@
+language: python
+python:
+  - "3.4"
+  - "3.3"
+  - "2.7"
+  - "2.6"
+  - "pypy"
+  - "pypy3"
+install:
+  - pip install coveralls
+  - python setup.py -q install
+script:
+  coverage run --source=pypermedia setup.py test
+after_success:
+  coveralls
