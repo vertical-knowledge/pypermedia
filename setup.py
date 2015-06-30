@@ -17,7 +17,7 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'DESCRIPTION.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
-version = '0.3.0'  # For when you integrate zest.releaser.
+version = '0.4.0'  # For when you integrate zest.releaser.
 
 # run-time dependencies, listed here so that they can be shared with test requirements
 install_requirements = [
