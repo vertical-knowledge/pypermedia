@@ -57,7 +57,7 @@ docs/_build/
 target/
 
 # PyCharm files
- .idea
+.idea
 
 # Passwords will get stored in setup.cfg  Dont include taht
 setup.cfg
