@@ -134,7 +134,7 @@ Now suppose the endpoint returned the following SIREN response.
 We could then access the various properties on the
 object.
 
-.. doctest:: siren
+.. code-block:: python
 
     >>> print(siren_obj.orderNumber)
     42
@@ -145,7 +145,7 @@ object.
 
 Additionally, we could see that the class name was indeed order
 
-.. doctest:: siren
+.. code-block:: python
 
     >>> print(siren_obj.__class__.__name__)
     order
