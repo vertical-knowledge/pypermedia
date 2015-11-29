@@ -100,6 +100,7 @@ class SirenBuilder(RequestMixin):
         """
         classname = entity_dict['class']
         properties = entity_dict.get('properties', {})
+        rel = entity_dict.get('rel', [])
 
         actions = []  # odd that multiple actions can have the same name, is this for overloading? it will break python!
         for action_dict in entity_dict.get('actions', []):
@@ -120,7 +121,7 @@ class SirenBuilder(RequestMixin):
             entities.append(entity)
 
         siren_entity = SirenEntity(classnames=classname, properties=properties, actions=actions,
-                                   links=links, entities=entities, verify=self.verify,
+                                   links=links, entities=entities, rel=rel, verify=self.verify,
                                    request_factory=self.request_factory)
         return siren_entity
 
@@ -144,7 +145,7 @@ class SirenEntity(RequestMixin):
 
     log = logging.getLogger(__name__)
 
-    def __init__(self, classnames, links, properties=None, actions=None, entities=None, **kwargs):
+    def __init__(self, classnames, links, properties=None, actions=None, entities=None, rel=None, **kwargs):
         """
         Constructor.
 
@@ -162,6 +163,7 @@ class SirenEntity(RequestMixin):
         if not classnames or len(classnames) == 0:
             raise ValueError('Parameter "classnames" must have at least one element.')
         self.classnames = classnames
+        self.rel = rel
 
         self.properties = properties if properties else {}
         self.actions = actions if actions else []
