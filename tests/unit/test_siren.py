@@ -106,9 +106,9 @@ class TestSirenEntity(unittest2.TestCase):
         self.assertEqual(entity.get_entities('sakdf'), [])
 
     def test_get_entities(self):
-        ent = mock.Mock(rel=['myrel'])
-        entity = SirenEntity(['blah'], [ent])
-        resp = entity.get_links('myrel')
+        ent = SirenEntity(['blah'], [], rel=['myrel'])
+        entity = SirenEntity(['builderah'], [], entities=[ent])
+        resp = entity.get_entities('myrel')
         self.assertEqual([ent], resp)
         self.assertEqual(entity.get_entities('badrel'), [])
 
