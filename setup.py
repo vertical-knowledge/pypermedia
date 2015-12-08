@@ -17,7 +17,7 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'DESCRIPTION.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
-version = '0.4.1.dev0'
+version = '0.4.1'
 
 # run-time dependencies, listed here so that they can be shared with test requirements
 install_requirements = [
