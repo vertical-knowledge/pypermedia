@@ -58,7 +58,7 @@ setup(
         'Programming Language :: Python :: 3.3',
     ],
 
-    keywords='client rest hypermedia http proxy siren api hateoas',
+    keywords=['client', 'rest', 'hypermedia', 'http', 'proxy', 'siren', 'api', 'hateoas'],
 
     packages=find_packages(include=['pypermedia', 'pypermedia.*', 'tests', 'tests.*']),
 
