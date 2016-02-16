@@ -17,7 +17,7 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'DESCRIPTION.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
-version = '0.4.1'
+version = '0.4.2'
 
 # run-time dependencies, listed here so that they can be shared with test requirements
 install_requirements = [
@@ -58,7 +58,7 @@ setup(
         'Programming Language :: Python :: 3.3',
     ],
 
-    keywords=['client', 'rest', 'hypermedia', 'http', 'proxy', 'siren', 'api', 'hateoas'],
+    keywords='client rest hypermedia http proxy siren api hateoas',
 
     packages=find_packages(include=['pypermedia', 'pypermedia.*', 'tests', 'tests.*']),
 
