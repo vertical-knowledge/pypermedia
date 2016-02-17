@@ -1,10 +1,17 @@
 CHANGELOG
 =========
 
-0.4.1 (unreleased)
+0.4.2 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Minor cleanup of the setup.py
+- Miscellaneous
+
+
+0.4.1 (2015-12-08)
+------------------
+
+- Added rel to Siren Entities.
 
 
 0.4.0 (2015-06-30)

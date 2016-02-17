@@ -17,10 +17,8 @@ from requests import Response, Session, Request
 
 def _check_and_decode_response(response):
     """
-    Checks if the response is valid.  If it is,
-    it returns the response body.  Otherwise
-    it raises an exception or returns None if
-    the status_code is 404.
+    Checks if the response is valid.  If it is, it returns the response body.  Otherwise it raises an exception or
+    returns None if the status_code is 404.
 
     :param Response response: The response to check
     :return: The response body if appropriate.
@@ -77,7 +75,9 @@ class SirenBuilder(RequestMixin):
             try:
                 response = json.loads(response)
             except ValueError as e:
-                raise MalformedSirenError(message='Parameter "response" must be valid json. Unable to construct siren objects.', errors=e)
+                raise MalformedSirenError(
+                    message='Parameter "response" must be valid json. Unable to construct siren objects.',
+                    errors=e)
 
         # check preferred dict type
         if type(response) is not dict:
@@ -86,7 +86,10 @@ class SirenBuilder(RequestMixin):
         try:
             return self._construct_entity(response)
         except Exception as e:
-            raise MalformedSirenError(message='Siren response is malformed and is missing one or more required values. Unable to create python object representation.', errors=e)
+            raise MalformedSirenError(
+                message='Siren response is malformed and is missing one or more required values. '
+                        'Unable to create python object representation.',
+                errors=e)
 
     def _construct_entity(self, entity_dict):
         """
@@ -107,7 +110,7 @@ class SirenBuilder(RequestMixin):
             siren_action = SirenAction(request_factory=self.request_factory, verify=self.verify, **action_dict)
             actions.append(siren_action)
 
-        links = []  # odd that multiple links can have the same relationship and that because this is a list we could have overloading?? this will break python!
+        links = []  # odd that multiple links can have the same relationship & that because this is a list we could  have overloading?? this will break python!
         for links_dict in entity_dict.get('links', []):
             link = self._construct_link(links_dict)
             links.append(link)
@@ -141,7 +144,10 @@ class SirenBuilder(RequestMixin):
 
 
 class SirenEntity(RequestMixin):
-    """Represents a siren-entity object. This is the highest-level/root item used by Siren. These represent instances/classes."""
+    """
+    Represents a siren-entity object. This is the highest-level/root item used by Siren. These represent
+    instances/classes.
+    """
 
     log = logging.getLogger(__name__)
 
@@ -149,7 +155,8 @@ class SirenEntity(RequestMixin):
         """
         Constructor.
 
-        :param classnames: root classnames of the response, currently these do nothing, in the future they will be used to add expanded functionality to an object .
+        :param classnames: root classnames of the response, currently these do nothing, in the future they will be used
+            to add expanded functionality to an object.
         :type classnames: str or list[str]
         :param links: link relations to self and related but non owned items
         :type links: str or list[str]
@@ -191,8 +198,7 @@ class SirenEntity(RequestMixin):
 
     def get_entities(self, rel):
         """
-        Obtains an entity based upon the relationship
-        value.
+        Obtains an entity based upon the relationship value.
 
         :param rel: relationship between this entity and the linked resource
         :type rel: str
@@ -205,7 +211,8 @@ class SirenEntity(RequestMixin):
 
     def get_primary_classname(self):
         """
-        Obtains the primary classname associated with this entity. This is assumed to be the first classname in the list of classnames associated with this entity.
+        Obtains the primary classname associated with this entity. This is assumed to be the first classname in the list
+        of classnames associated with this entity.
 
         :return: primary classname
         :rtype: str
@@ -214,7 +221,8 @@ class SirenEntity(RequestMixin):
 
     def get_base_classnames(self):
         """
-        Obtains the base classnames associated with this entity. This is assumed to be all values following the first/primary classname.
+        Obtains the base classnames associated with this entity. This is assumed to be all values following the
+        first/primary classname.
 
         :return: base classnames
         :rtype: str
@@ -248,7 +256,8 @@ class SirenEntity(RequestMixin):
         """
         Programmatically create a python object for this siren entity.
 
-        :return: dynamically created object based upon the siren response, type is based upon the classname(s) of this siren entity
+        :return: dynamically created object based upon the siren response, type is based upon the classname(s) of this
+        siren entity
         :rtype: object
         """
         ModelClass = type(str(self.get_primary_classname()), (), self.properties)
@@ -332,7 +341,7 @@ class SirenAction(RequestMixin):
         self.href = href
         self.type = type
         self.fields = fields if fields else []
-        super(SirenAction, self).__init__(request_factory=request_factory, verify=verify)
+        super(SirenAction, self).__init__(request_factory=request_factory, verify=verify, **kwargs)
 
     @staticmethod
     def create_field(name, type=None, value=None):
@@ -434,7 +443,8 @@ class SirenAction(RequestMixin):
         """
         bound_href, request_fields = self._get_bound_href(TemplatedString, **kwfields)
 
-        # update query/post parameters specified from sirenaction with remaining arg values (we ignore anything not specified for the action)
+        # update query/post parameters specified from sirenaction with remaining arg values
+        # (we ignore anything not specified for the action)
         fields = self.get_fields_as_dict()
         fields.update(request_fields)
 
@@ -484,7 +494,10 @@ class SirenAction(RequestMixin):
 
 
 class SirenLink(SirenBuilder):
-    """Representation of a Link in Siren. Links are traversals to related objects that exist outside of normal entity (parent-child) ownership."""
+    """
+    Representation of a Link in Siren. Links are traversals to related objects that exist outside of normal entity
+    (parent-child) ownership.
+    """
 
     def __init__(self, rel, href, verify=False, request_factory=Request):
         """
@@ -602,7 +615,8 @@ class MalformedSirenError(Exception):
 
 class UnexpectedStatusError(Exception):
     """
-    Unexpected status was returned from the service. These are errant statuses from which the library cannot recover to create an object.
+    Unexpected status was returned from the service. These are errant statuses from which the library cannot recover to
+    create an object.
     """
     def __init__(self, message, errors=None):
         Exception.__init__(self, message)
@@ -650,7 +664,8 @@ class TemplatedString(object):
 
     def bind(self, **kwargs):
         """
-        Binds the keyword arguments against the template variables. Partial binding is permitted. Later rebinding is not possible.
+        Binds the keyword arguments against the template variables. Partial binding is permitted. Later rebinding is not
+        possible.
 
         :param kwargs: parameters and binding values
         :type kwargs: dict[str, str]
