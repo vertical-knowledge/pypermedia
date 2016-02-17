@@ -1,4 +1,4 @@
-Hypermedia Client
+Pypermedia
 =================
 
 
@@ -36,12 +36,11 @@ Hypermedia Client
 
 
 
-The Hypermedia client serves as a python developer's API for access to services
-which return certain hypermedia mimetypes. The client self-discovers services 
-from the endpoint and relies entirely upon responses from the server for 
-operation. It can be considered a proxy for the REST service and allows 
-developers to program against a hypermedia provider without need for 
-understanding HTTP or network conceits aside from the root API URL. 
+Pypermedia is a hypermedia client serves as a python developer's API for access to services which return certain
+    hypermedia mimetypes. The client self-discovers services from the endpoint and relies entirely
+    upon responses from the server for operation. It can be considered a proxy for the REST service and allows
+    developers to program against a hypermedia provider without need for understanding HTTP or network conceits aside
+    from the root API URL.
 
 Currently supports SIREN.
 
@@ -52,9 +51,9 @@ For information on the protocol see the
 `specification. <https://github.com/kevinswiber/siren>`_
 
 The client allows you to interact with a SIREN protocol web api
-as if it were a python object.  It automatically generates python
+as if it were a python object. It automatically generates python
 objects with attributes corresponding to the SIREN properties and
-methods to the SIREN actions.  Additionally, it gives you access to
+methods to the SIREN actions. Additionally, it gives you access to
 SIREN links and subentities.
 
 To connect the client you simply need to provide an initial
@@ -186,8 +185,8 @@ Additionally, we could see that the class name was indeed order
     order
 
 Where you can really see the power of the SIREN protocol is
-when you go to perform actions.  In this case, we can see that
-there is an action called add-item.  We can simply call that
+when you go to perform actions. In this case, we can see that
+there is an action called add-item. We can simply call that
 on the siren_obj and we will get a new SIREN object representing
 the response from the server for adding an item.
 
