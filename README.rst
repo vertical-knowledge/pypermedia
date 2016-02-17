@@ -1,6 +1,41 @@
 Hypermedia Client
 =================
 
+
+
+.. image:: https://travis-ci.org/vertical-knowledge/pypermedia.svg?branch=master&style=flat
+    :target: https://travis-ci.org/vertical-knowledge/pypermedia
+    :alt: test status
+
+.. image:: https://coveralls.io/repos/vertical-knowledge/pypermedia/badge.svg?branch=master&style=flat
+    :target: https://coveralls.io/r/vertical-knowledge/pypermedia?branch=master
+    :alt: test coverage
+
+.. image:: https://readthedocs.org/projects/pypermedia/badge/?version=latest
+    :target: https://pypermedia.readthedocs.org/
+    :alt: Documentation Status
+
+..
+    .. image:: https://pypip.in/version/pypermedia/badge.svg?style=flat
+        :target: https://pypi.python.org/pypi/pypermedia/
+        :alt: current version
+
+..
+    .. image:: https://pypip.in/download/pypermedia/badge.png?style=flat
+        :target: https://pypi.python.org/pypi/pypermedia/
+        :alt: PyPI downloads
+
+.. image:: https://img.shields.io/pypi/dm/pypermedia.svg?style=flat
+    :target: https://pypi.python.org/pypi/pypermedia/
+    :alt: python versions
+
+
+.. image:: https://img.shields.io/github/stars/vertical-knowledge/pypermedia.svg?style=flat
+    :target: https://github.com/vertical-knowledge/pypermedia/
+    :alt: stars
+
+
+
 The Hypermedia client serves as a python developer's API for access to services
 which return certain hypermedia mimetypes. The client self-discovers services 
 from the endpoint and relies entirely upon responses from the server for 
