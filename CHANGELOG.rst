@@ -4,8 +4,9 @@ CHANGELOG
 0.4.2 (unreleased)
 ------------------
 
+- Updated init import so that README example works.
 - Minor cleanup of the setup.py
-- Miscellaneous
+- Miscellaneous code cleanup.
 
 
 0.4.1 (2015-12-08)
